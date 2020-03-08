@@ -288,8 +288,8 @@ void
 Forwarder::onIncomingData(Face& inFace, const Data& data)
 {
   // receive Data
-  NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName());
-  std::cout << "Forwarder::onIncomingData face=" << inFace.getId() << " data=" << data.getName() << "\n";
+  NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " pushed=" << data.isPushed());
+  std::cout << "Forwarder::onIncomingData face=" << inFace.getId() << " data=" << data.getName() << data.isPushed() << "\n";
   data.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
   ++m_counters.nInData;
 
@@ -305,7 +305,11 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
     return;
   }
 
-  // I'm going to add the pushed data pipeline here
+  // Logic of Pushed-Data
+  if (data.isPushed()) {
+    this->onPushedData(inFace, data);
+    return;
+  }
 
   // PIT match
   pit::DataMatchResult pitMatches = m_pit.findAllDataMatches(data);
@@ -396,6 +400,48 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
       this->onOutgoingData(data, *pendingDownstream);
     }
   }
+}
+
+void
+Forwarder::onPushedData(const Face& face, const Data& data) {
+    NFD_LOG_DEBUG("onPushedData");
+    std::cout << "onPushedData data="<< data.getName() << " face=" << face.getId() << "\n";
+    bool dataInCS = false;
+
+    if (m_csFromNdnSim == nullptr) {
+      dataInCS = m_cs.contains(data);
+    }
+    else {
+      std::cout << "using ndn sim content store. This could be problematic...\n";
+      // creating an interest whose name is the same as the data packet to dupe lookup function
+      shared_ptr<Interest> interest = make_shared<Interest>();
+      interest->setName(data.getName());
+      shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
+      if (match != nullptr) {
+        dataInCS = true;
+      }
+    }
+
+    if(!dataInCS) {
+        // If Data was never seen, store it and forward it.
+        // TODO: improve the forwarding strategy adopted here.
+        if (m_csFromNdnSim == nullptr) {
+          m_cs.insert(data, true);
+        } else {
+          m_csFromNdnSim->Add(data.shared_from_this());
+        }
+        const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
+        const fib::NextHopList& nexthops = fibEntry.getNextHops();
+        // Determine the minimum cost in the RIB entry.
+        uint64_t minCost = std::numeric_limits<uint64_t>::max();
+        for(auto const& nh : nexthops)
+            if(nh.getCost() < minCost)
+              minCost = nh.getCost();
+        // Forward to all devices with minCost.
+        for(auto const& nh : nexthops)
+            if(nh.getCost() == minCost && face.getId() != nh.getFace().getId())
+              this->onOutgoingData(data, nh.getFace());
+    }
 }
 
 void

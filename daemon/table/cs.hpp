@@ -82,6 +82,11 @@ public:
        const HitCallback& hitCallback,
        const MissCallback& missCallback) const;
 
+  /** \brief checks in content store already contains data
+   *  \param data the data for the lookup
+   */
+  bool contains(const Data& data);
+
   /** \brief get number of stored packets
    */
   size_t

@@ -239,6 +239,11 @@ PUBLIC_WITH_TESTS_ELSE_PRIVATE: // pipelines
   VIRTUAL_WITH_TESTS void
   onIncomingData(Face& inFace, const Data& data);
 
+  /** \brief incoming Pushed-Data pipeline
+   */
+  VIRTUAL_WITH_TESTS void
+  onPushedData(const Face& face, const Data& data);
+
   /** \brief Data unsolicited pipeline
    */
   VIRTUAL_WITH_TESTS void
