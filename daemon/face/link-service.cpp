@@ -72,6 +72,8 @@ LinkService::sendData(const Data& data)
 
   ++this->nOutData;
 
+  std::cout << "LinkService::sendData. data=" << data.getName() << "\n";
+
   doSendData(data);
 
   afterSendData(data);
@@ -107,6 +109,7 @@ LinkService::receiveData(const Data& data)
 
   ++this->nInData;
 
+  std::cout << "LinkService::receiveData data=" << data.getName() << "\n";
   afterReceiveData(data);
 }
 

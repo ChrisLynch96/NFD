@@ -155,6 +155,8 @@ Strategy::beforeSatisfyInterest(const shared_ptr<pit::Entry>& pitEntry,
 {
   NFD_LOG_DEBUG("beforeSatisfyInterest pitEntry=" << pitEntry->getName() <<
                 " inFace=" << inFace.getId() << " data=" << data.getName());
+  std::cout << "Strategy::beforeSatisfyInterest pitEntry=" << pitEntry->getName() <<
+                " inFace=" << inFace.getId() << " data=" << data.getName() << "\n";
 }
 
 void
@@ -173,6 +175,8 @@ Strategy::afterReceiveData(const shared_ptr<pit::Entry>& pitEntry,
 {
   NFD_LOG_DEBUG("afterReceiveData pitEntry=" << pitEntry->getName() <<
                 " inFace=" << inFace.getId() << " data=" << data.getName());
+  std::cout << "afterReceiveData pitEntry=" << pitEntry->getName() <<
+                " inFace=" << inFace.getId() << " data=" << data.getName() << "\n";
 
   this->beforeSatisfyInterest(pitEntry, inFace, data);
 
@@ -198,6 +202,7 @@ Strategy::sendData(const shared_ptr<pit::Entry>& pitEntry, const Data& data, con
 {
   BOOST_ASSERT(pitEntry->getInterest().matchesData(data));
 
+  std::cout << "Strategy::sendData data=" << data.getName() << "\n";
   // delete the PIT entry's in-record based on outFace,
   // since Data is sent to outFace from which the Interest was received
   pitEntry->deleteInRecord(outFace);
@@ -211,6 +216,7 @@ Strategy::sendDataToAll(const shared_ptr<pit::Entry>& pitEntry, const Face& inFa
   std::set<Face*> pendingDownstreams;
   auto now = time::steady_clock::now();
 
+  std::cout << "Strategy::sendDataToAll data=" << data.getName() << "\n";
   // remember pending downstreams
   for (const pit::InRecord& inRecord : pitEntry->getInRecords()) {
     if (inRecord.getExpiry() > now) {

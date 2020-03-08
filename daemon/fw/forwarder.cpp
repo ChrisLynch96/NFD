@@ -170,7 +170,6 @@ Forwarder::onInterestLoop(Face& inFace, const Interest& interest)
   NFD_LOG_DEBUG("onInterestLoop face=" << inFace.getId() <<
                 " interest=" << interest.getName() <<
                 " send-Nack-duplicate");
-
   // send Nack with reason=DUPLICATE
   // note: Don't enter outgoing Nack pipeline because it needs an in-record.
   lp::Nack nack(interest);
@@ -189,6 +188,7 @@ Forwarder::onContentStoreMiss(const Face& inFace, const shared_ptr<pit::Entry>& 
                               const Interest& interest)
 {
   NFD_LOG_DEBUG("onContentStoreMiss interest=" << interest.getName());
+  std::cout << "onContentStoreMiss interest=" << interest.getName() << "\n";
   ++m_counters.nCsMisses;
 
   // insert in-record
@@ -206,6 +206,7 @@ Forwarder::onContentStoreMiss(const Face& inFace, const shared_ptr<pit::Entry>& 
     Face* nextHopFace = m_faceTable.get(*nextHopTag);
     if (nextHopFace != nullptr) {
       NFD_LOG_DEBUG("onContentStoreMiss interest=" << interest.getName() << " nexthop-faceid=" << nextHopFace->getId());
+      std::cout << "onContentStoreMiss interest=" << interest.getName() << " nexthop-faceid=" << nextHopFace->getId() << "\n";
       // go to outgoing Interest pipeline
       // scope control is unnecessary, because privileged app explicitly wants to forward
       this->onOutgoingInterest(pitEntry, *nextHopFace, interest);
@@ -223,6 +224,7 @@ Forwarder::onContentStoreHit(const Face& inFace, const shared_ptr<pit::Entry>& p
                              const Interest& interest, const Data& data)
 {
   NFD_LOG_DEBUG("onContentStoreHit interest=" << interest.getName());
+  std::cout << "onContentStoreHit interest=" << interest.getName() << "\n";
   ++m_counters.nCsHits;
 
   data.setTag(make_shared<lp::IncomingFaceIdTag>(face::FACEID_CONTENT_STORE));
@@ -248,7 +250,6 @@ Forwarder::onOutgoingInterest(const shared_ptr<pit::Entry>& pitEntry, Face& outF
 {
   NFD_LOG_DEBUG("onOutgoingInterest face=" << outFace.getId() <<
                 " interest=" << pitEntry->getName());
-
   // insert out-record
   pitEntry->insertOrUpdateOutRecord(outFace, interest);
 
@@ -288,6 +289,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 {
   // receive Data
   NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName());
+  std::cout << "Forwarder::onIncomingData face=" << inFace.getId() << " data=" << data.getName() << "\n";
   data.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
   ++m_counters.nInData;
 
@@ -297,6 +299,8 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
   if (isViolatingLocalhost) {
     NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() <<
                   " data=" << data.getName() << " violates /localhost");
+    std::cout << "Forwarder::onIncomingData face=" << inFace.getId() <<
+                  " data=" << data.getName() << " violates /localhost\n";
     // (drop)
     return;
   }
@@ -323,6 +327,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
     auto& pitEntry = pitMatches.front();
 
     NFD_LOG_DEBUG("onIncomingData matching=" << pitEntry->getName());
+    std::cout << "Forwarder::onIncomingData matching=" << pitEntry->getName() << "\n";
 
     // set PIT expiry timer to now
     this->setExpiryTimer(pitEntry, 0_ms);
@@ -350,6 +355,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 
     for (const shared_ptr<pit::Entry>& pitEntry : pitMatches) {
       NFD_LOG_DEBUG("onIncomingData matching=" << pitEntry->getName());
+      std::cout << "onIncomingData matching=" << pitEntry->getName() << "\n";
 
       // remember pending downstreams
       for (const pit::InRecord& inRecord : pitEntry->getInRecords()) {
@@ -406,6 +412,9 @@ Forwarder::onDataUnsolicited(Face& inFace, const Data& data)
   NFD_LOG_DEBUG("onDataUnsolicited face=" << inFace.getId() <<
                 " data=" << data.getName() <<
                 " decision=" << decision);
+  std::cout << "Forwarder::onDataUnsolicited face=" << inFace.getId() <<
+                " data=" << data.getName() <<
+                " decision=" << decision << "\n";
 }
 
 void
@@ -413,16 +422,19 @@ Forwarder::onOutgoingData(const Data& data, Face& outFace)
 {
   if (outFace.getId() == face::INVALID_FACEID) {
     NFD_LOG_WARN("onOutgoingData face=invalid data=" << data.getName());
+    std::cout << "Forwarder::onOutgoingData face=invalid data=" << data.getName() << "\n";
     return;
   }
   NFD_LOG_DEBUG("onOutgoingData face=" << outFace.getId() << " data=" << data.getName());
-
+  std::cout << "Forwarder::onOutgoingData face=" << outFace.getId() << " data=" << data.getName() << "\n";
   // /localhost scope control
   bool isViolatingLocalhost = outFace.getScope() == ndn::nfd::FACE_SCOPE_NON_LOCAL &&
                               scope_prefix::LOCALHOST.isPrefixOf(data.getName());
   if (isViolatingLocalhost) {
     NFD_LOG_DEBUG("onOutgoingData face=" << outFace.getId() <<
                   " data=" << data.getName() << " violates /localhost");
+    std::cout << "Forwarder::onOutgoingData face=" << outFace.getId() <<
+                  " data=" << data.getName() << " violates /localhost\n";
     // (drop)
     return;
   }
