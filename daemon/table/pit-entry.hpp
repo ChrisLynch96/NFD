@@ -105,6 +105,7 @@ public: // in-record
   bool
   hasInRecords() const
   {
+    std::cout << "PitEntry::hasInRecords empty=" << m_inRecords.empty() << "\n";
     return !m_inRecords.empty();
   }
 

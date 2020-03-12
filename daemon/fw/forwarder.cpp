@@ -89,6 +89,7 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   // receive Interest
   NFD_LOG_DEBUG("onIncomingInterest face=" << inFace.getId() <<
                 " interest=" << interest.getName());
+  std::cout << "Forwarder::onIncomingInterest interest=" << interest.getName() << " face=" << inFace.getId() << "\n";
   interest.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
   ++m_counters.nInInterests;
 
@@ -98,6 +99,7 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   if (isViolatingLocalhost) {
     NFD_LOG_DEBUG("onIncomingInterest face=" << inFace.getId() <<
                   " interest=" << interest.getName() << " violates /localhost");
+    std::cout << "Forwarder::onIncomingInterest interest=" << interest.getName() << " face=" << inFace.getId() << " VIOLATES LOCAL SCOPE\n";
     // (drop)
     return;
   }
@@ -106,6 +108,7 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   bool hasDuplicateNonceInDnl = m_deadNonceList.has(interest.getName(), interest.getNonce());
   if (hasDuplicateNonceInDnl) {
     // goto Interest loop pipeline
+    std::cout << "Forwarder::onIncomingInterest heading to interest loop pipeline from dead nonce list detection\n";
     this->onInterestLoop(inFace, interest);
     return;
   }
@@ -115,6 +118,8 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
       m_networkRegionTable.isInProducerRegion(interest.getForwardingHint())) {
     NFD_LOG_DEBUG("onIncomingInterest face=" << inFace.getId() <<
                   " interest=" << interest.getName() << " reaching-producer-region");
+    std::cout << "Forwarder::onIncomingInterest face=" << inFace.getId() <<
+                  " interest=" << interest.getName() << " reaching-producer-region\n";
     const_cast<Interest&>(interest).setForwardingHint({});
   }
 
@@ -130,21 +135,26 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   }
   if (hasDuplicateNonceInPit) {
     // goto Interest loop pipeline
+    std::cout << "Forwarder::onIncomingInterest heading to interest loop pipeline second\n";
     this->onInterestLoop(inFace, interest);
     return;
   }
-
+  std::cout << "Forwarder::onIncomingInterest about to check the pitEntry\n";
   // is pending?
   if (!pitEntry->hasInRecords()) {
     if (m_csFromNdnSim == nullptr) {
+      std::cout << "Forwarder::onIncomingInterest looking in normal content store...\n";
       m_cs.find(interest,
                 bind(&Forwarder::onContentStoreHit, this, std::ref(inFace), pitEntry, _1, _2),
                 bind(&Forwarder::onContentStoreMiss, this, std::ref(inFace), pitEntry, _1));
     }
     else {
+      std::cout << "Forwarder::onIncomingInterest looking in ndnSim content store...\n";
       shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest.shared_from_this());
       if (match != nullptr) {
         this->onContentStoreHit(inFace, pitEntry, interest, *match);
+        std::cout << "Forwarder::onIncomingInterest face=" << inFace.getId() <<
+                  " interest=" << interest.getName() << " content store was hit\n";
       }
       else {
         this->onContentStoreMiss(inFace, pitEntry, interest);
@@ -152,6 +162,7 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
     }
   }
   else {
+    std::cout << "Forwarder::onIncomingInterest the PIT has previously pending interests\n";
     this->onContentStoreMiss(inFace, pitEntry, interest);
   }
 }
@@ -202,6 +213,7 @@ Forwarder::onContentStoreMiss(const Face& inFace, const shared_ptr<pit::Entry>& 
   // has NextHopFaceId?
   shared_ptr<lp::NextHopFaceIdTag> nextHopTag = interest.getTag<lp::NextHopFaceIdTag>();
   if (nextHopTag != nullptr) {
+    std::cout << "Forwarder::onContentStoreMiss inFace=" << inFace.getId() << " interest=" << interest.getName() << " has nextHopTag \n";
     // chosen NextHop face exists?
     Face* nextHopFace = m_faceTable.get(*nextHopTag);
     if (nextHopFace != nullptr) {
@@ -213,7 +225,7 @@ Forwarder::onContentStoreMiss(const Face& inFace, const shared_ptr<pit::Entry>& 
     }
     return;
   }
-
+  std::cout << "Forwarder::OnContentStoreMiss dispatching to strategy face=" << inFace.getId() << " interest=" << interest.getName() << "\n";
   // dispatch to strategy: after incoming Interest
   this->dispatchToStrategy(*pitEntry,
     [&] (fw::Strategy& strategy) { strategy.afterReceiveInterest(inFace, interest, pitEntry); });
@@ -289,7 +301,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 {
   // receive Data
   NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " pushed=" << data.isPushed());
-  std::cout << "Forwarder::onIncomingData face=" << inFace.getId() << " data=" << data.getName() << data.isPushed() << "\n";
+  std::cout << "Forwarder::onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " pushed=" << data.isPushed() << "\n";
   data.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
   ++m_counters.nInData;
 
@@ -403,45 +415,57 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 }
 
 void
-Forwarder::onPushedData(const Face& face, const Data& data) {
-    NFD_LOG_DEBUG("onPushedData");
-    std::cout << "onPushedData data="<< data.getName() << " face=" << face.getId() << "\n";
-    bool dataInCS = false;
+Forwarder::onPushedData(Face& inFace, const Data& data) {
+  NFD_LOG_DEBUG("onPushedData");
+  std::cout << "onPushedData data="<< data.getName() << " face=" << inFace.getId() << "\n";
+  bool dataInCS = false;
 
-    if (m_csFromNdnSim == nullptr) {
-      dataInCS = m_cs.contains(data);
+  if (m_csFromNdnSim == nullptr) {
+    dataInCS = m_cs.contains(data);
+  }
+  else {
+    std::cout << "using ndn sim content store. This could be problematic...\n";
+    // creating an interest whose name is the same as the data packet to dupe lookup function
+    shared_ptr<Interest> interest = make_shared<Interest>();
+    interest->setName(data.getName());
+    shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
+    if (match != nullptr) {
+      dataInCS = true;
     }
-    else {
-      std::cout << "using ndn sim content store. This could be problematic...\n";
-      // creating an interest whose name is the same as the data packet to dupe lookup function
-      shared_ptr<Interest> interest = make_shared<Interest>();
-      interest->setName(data.getName());
-      shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
-      if (match != nullptr) {
-        dataInCS = true;
+  }
+
+  std::cout << "Forwarder::onPushedData dataInCS=" << dataInCS << "\n";
+
+  if(!dataInCS) {
+    // If Data was never seen, store it and forward it.
+    // TODO: improve the forwarding strategy adopted here.
+    std::cout << "inserting data into CS\n";
+    if (m_csFromNdnSim == nullptr) {
+      m_cs.insert(data, true);
+    } else {
+      m_csFromNdnSim->Add(data.shared_from_this());
+    }
+    std::cout << "Forwarder::onPushedData checking FIB data=" << data.getName() << " face=" << inFace.getId() << " fib size=" << m_fib.size() << "\n";
+    const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
+    const fib::NextHopList& nexthops = fibEntry.getNextHops();
+
+    std::cout << "Forwarder::onPushedData nexthops=" << nexthops.size() << "\n";
+
+    // Determine the minimum cost in the RIB entry.
+    uint64_t minCost = std::numeric_limits<uint64_t>::max();
+    for(auto const& nh : nexthops)
+      if(nh.getCost() < minCost)
+        minCost = nh.getCost();
+    
+    // Forward to all devices with minCost.
+    for(auto const& nh : nexthops) {
+      std::cout << "Forwarder::onPushedData nhFace=" << nh.getFace().getId() << " nh.getCost()=" << nh.getCost() << " inFace=" << inFace.getId() << " minCost=" << minCost << "\n";
+      if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
+        std::cout << "Forwarder::onPushedData pushing packet data=" << data.getName() << " face=" << nh.getFace().getId() << "\n";
+        this->onOutgoingData(data, nh.getFace());
       }
     }
-
-    if(!dataInCS) {
-        // If Data was never seen, store it and forward it.
-        // TODO: improve the forwarding strategy adopted here.
-        if (m_csFromNdnSim == nullptr) {
-          m_cs.insert(data, true);
-        } else {
-          m_csFromNdnSim->Add(data.shared_from_this());
-        }
-        const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
-        const fib::NextHopList& nexthops = fibEntry.getNextHops();
-        // Determine the minimum cost in the RIB entry.
-        uint64_t minCost = std::numeric_limits<uint64_t>::max();
-        for(auto const& nh : nexthops)
-            if(nh.getCost() < minCost)
-              minCost = nh.getCost();
-        // Forward to all devices with minCost.
-        for(auto const& nh : nexthops)
-            if(nh.getCost() == minCost && face.getId() != nh.getFace().getId())
-              this->onOutgoingData(data, nh.getFace());
-    }
+  }
 }
 
 void

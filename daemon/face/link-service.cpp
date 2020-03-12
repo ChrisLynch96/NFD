@@ -99,6 +99,7 @@ LinkService::receiveInterest(const Interest& interest)
 
   ++this->nInInterests;
 
+  std::cout << "LinkService::receiveInterest interest=" << interest.getName() << "\n";
   afterReceiveInterest(interest);
 }
 

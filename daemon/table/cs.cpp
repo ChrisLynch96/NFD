@@ -143,10 +143,12 @@ Cs::find(const Interest& interest,
 
   if (match == last) {
     NFD_LOG_DEBUG("  no-match");
+    std::cout << "Cs::find no-match\n";
     missCallback(interest);
     return;
   }
   NFD_LOG_DEBUG("  matching " << match->getName());
+  std::cout << "Cs::find matching" << match->getName() << "\n";
   m_policy->beforeUse(match);
   hitCallback(interest, match->getData());
 }

@@ -60,7 +60,7 @@ InRecordCollection::iterator
 Entry::insertOrUpdateInRecord(Face& face, const Interest& interest)
 {
   BOOST_ASSERT(this->canMatch(interest));
-
+  
   auto it = std::find_if(m_inRecords.begin(), m_inRecords.end(),
     [&face] (const InRecord& inRecord) { return &inRecord.getFace() == &face; });
   if (it == m_inRecords.end()) {
