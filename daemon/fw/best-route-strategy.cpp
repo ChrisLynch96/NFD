@@ -40,7 +40,6 @@ BestRouteStrategyBase::afterReceiveInterest(const Face& inFace, const Interest& 
 {
   if (hasPendingOutRecords(*pitEntry)) {
     // not a new Interest, don't forward
-    std::cout << "BestRouteStrategyBase::afterReceiveInterest face=" << inFace.getId() << " interest=" << interest.getName() << "the interest already exists in the pending interest table and will not be forwarded\n";
     return;
   }
 
@@ -53,7 +52,6 @@ BestRouteStrategyBase::afterReceiveInterest(const Face& inFace, const Interest& 
       return;
     }
   }
-  std::cout << "BestRouteStrategyBase::afterReceiveInterest face=" << inFace.getId() << " interest=" << interest.getName() << "The interest is being rejected \n";
   this->rejectPendingInterest(pitEntry);
 }
 

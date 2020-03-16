@@ -131,7 +131,6 @@ BestRouteStrategy2::afterReceiveInterest(const Face& inFace, const Interest& int
   if (suppression == RetxSuppressionResult::SUPPRESS) {
     NFD_LOG_DEBUG(interest << " from=" << inFace.getId()
                            << " suppressed");
-    std::cout << "BestRouteStrategy2::afterReceiveInterest is being supressed face=" << inFace.getId() << " interest=" << interest.getName() << "\n";
     return;
   }
 
