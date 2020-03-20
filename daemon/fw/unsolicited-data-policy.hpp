@@ -135,8 +135,8 @@ public:
 
 /** \brief the default UnsolicitedDataPolicy
  */
-// typedef DropAllUnsolicitedDataPolicy DefaultUnsolicitedDataPolicy;
 typedef DropAllUnsolicitedDataPolicy DefaultUnsolicitedDataPolicy;
+// typedef AdmitAllUnsolicitedDataPolicy DefaultUnsolicitedDataPolicy;
 
 } // namespace fw
 } // namespace nfd

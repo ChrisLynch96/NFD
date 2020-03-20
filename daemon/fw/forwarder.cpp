@@ -186,7 +186,7 @@ void
 Forwarder::onContentStoreMiss(const Face& inFace, const shared_ptr<pit::Entry>& pitEntry,
                               const Interest& interest)
 {
-  NFD_LOG_DEBUG("onContentStoreMiss interest=" << interest.getName());
+  // NFD_LOG_DEBUG("onContentStoreMiss interest=" << interest.getName());
   ++m_counters.nCsMisses;
 
   // insert in-record
@@ -219,7 +219,7 @@ void
 Forwarder::onContentStoreHit(const Face& inFace, const shared_ptr<pit::Entry>& pitEntry,
                              const Interest& interest, const Data& data)
 {
-  NFD_LOG_DEBUG("onContentStoreHit interest=" << interest.getName());
+  // NFD_LOG_DEBUG("onContentStoreHit interest=" << interest.getName());
   ++m_counters.nCsHits;
 
   data.setTag(make_shared<lp::IncomingFaceIdTag>(face::FACEID_CONTENT_STORE));
@@ -243,8 +243,8 @@ Forwarder::onContentStoreHit(const Face& inFace, const shared_ptr<pit::Entry>& p
 void
 Forwarder::onOutgoingInterest(const shared_ptr<pit::Entry>& pitEntry, Face& outFace, const Interest& interest)
 {
-  NFD_LOG_DEBUG("onOutgoingInterest face=" << outFace.getId() <<
-                " interest=" << pitEntry->getName());
+  // NFD_LOG_DEBUG("onOutgoingInterest face=" << outFace.getId() <<
+  //               " interest=" << pitEntry->getName());
   // insert out-record
   pitEntry->insertOrUpdateOutRecord(outFace, interest);
 
@@ -256,8 +256,8 @@ Forwarder::onOutgoingInterest(const shared_ptr<pit::Entry>& pitEntry, Face& outF
 void
 Forwarder::onInterestFinalize(const shared_ptr<pit::Entry>& pitEntry)
 {
-  NFD_LOG_DEBUG("onInterestFinalize interest=" << pitEntry->getName() <<
-                (pitEntry->isSatisfied ? " satisfied" : " unsatisfied"));
+  // NFD_LOG_DEBUG("onInterestFinalize interest=" << pitEntry->getName() <<
+                // (pitEntry->isSatisfied ? " satisfied" : " unsatisfied"));
 
   if (!pitEntry->isSatisfied) {
     beforeExpirePendingInterest(*pitEntry);
@@ -283,7 +283,7 @@ void
 Forwarder::onIncomingData(Face& inFace, const Data& data)
 {
   // receive Data
-  NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " pushed=" << data.isPushed());
+  NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " freshness=" << data.getFreshnessPeriod() << " pushed=" << data.getPushed());
   data.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
   ++m_counters.nInData;
 
@@ -298,7 +298,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
   }
 
   // Logic of Pushed-Data
-  if (data.isPushed()) {
+  if (data.getPushed()) {
     this->onPushedData(inFace, data);
     return;
   }
@@ -399,6 +399,7 @@ Forwarder::onPushedData(Face& inFace, const Data& data) {
 
   if (m_csFromNdnSim == nullptr) {
     dataInCS = m_cs.contains(data);
+    NFD_LOG_DEBUG("Data in cs=" << dataInCS);
   }
   else {
     // creating an interest whose name is the same as the data packet to dupe lookup function
@@ -415,8 +416,10 @@ Forwarder::onPushedData(Face& inFace, const Data& data) {
     // TODO: improve the forwarding strategy adopted here.
     if (m_csFromNdnSim == nullptr) {
       m_cs.insert(data, true);
+      NFD_LOG_DEBUG("Inserting data into content store");
     } else {
       m_csFromNdnSim->Add(data.shared_from_this());
+      NFD_LOG_DEBUG("Inserting data into content store");
     }
     const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
     const fib::NextHopList& nexthops = fibEntry.getNextHops();
@@ -429,7 +432,9 @@ Forwarder::onPushedData(Face& inFace, const Data& data) {
     
     // Forward to all devices with minCost.
     for(auto const& nh : nexthops) {
+      NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
       if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
+        NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
         this->onOutgoingData(data, nh.getFace());
       }
     }
@@ -488,9 +493,9 @@ Forwarder::onIncomingNack(Face& inFace, const lp::Nack& nack)
 
   // if multi-access or ad hoc face, drop
   if (inFace.getLinkType() != ndn::nfd::LINK_TYPE_POINT_TO_POINT) {
-    NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
-                  " nack=" << nack.getInterest().getName() <<
-                  "~" << nack.getReason() << " face-is-multi-access");
+    // NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
+                  // " nack=" << nack.getInterest().getName() <<
+                  // "~" << nack.getReason() << " face-is-multi-access");
     return;
   }
 
@@ -498,9 +503,9 @@ Forwarder::onIncomingNack(Face& inFace, const lp::Nack& nack)
   shared_ptr<pit::Entry> pitEntry = m_pit.find(nack.getInterest());
   // if no PIT entry found, drop
   if (pitEntry == nullptr) {
-    NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
-                  " nack=" << nack.getInterest().getName() <<
-                  "~" << nack.getReason() << " no-PIT-entry");
+    // NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
+                  // " nack=" << nack.getInterest().getName() <<
+                  // "~" << nack.getReason() << " no-PIT-entry");
     return;
   }
 
@@ -508,24 +513,24 @@ Forwarder::onIncomingNack(Face& inFace, const lp::Nack& nack)
   pit::OutRecordCollection::iterator outRecord = pitEntry->getOutRecord(inFace);
   // if no out-record found, drop
   if (outRecord == pitEntry->out_end()) {
-    NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
-                  " nack=" << nack.getInterest().getName() <<
-                  "~" << nack.getReason() << " no-out-record");
+    // NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
+                  // " nack=" << nack.getInterest().getName() <<
+                  // "~" << nack.getReason() << " no-out-record");
     return;
   }
 
   // if out-record has different Nonce, drop
   if (nack.getInterest().getNonce() != outRecord->getLastNonce()) {
-    NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
-                  " nack=" << nack.getInterest().getName() <<
-                  "~" << nack.getReason() << " wrong-Nonce " <<
-                  nack.getInterest().getNonce() << "!=" << outRecord->getLastNonce());
+    // NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
+                  // " nack=" << nack.getInterest().getName() <<
+                  // "~" << nack.getReason() << " wrong-Nonce " <<
+                  // nack.getInterest().getNonce() << "!=" << outRecord->getLastNonce());
     return;
   }
 
-  NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
-                " nack=" << nack.getInterest().getName() <<
-                "~" << nack.getReason() << " OK");
+  // NFD_LOG_DEBUG("onIncomingNack face=" << inFace.getId() <<
+                // " nack=" << nack.getInterest().getName() <<
+                // "~" << nack.getReason() << " OK");
 
   // record Nack on out-record
   outRecord->setIncomingNack(nack);
@@ -556,23 +561,23 @@ Forwarder::onOutgoingNack(const shared_ptr<pit::Entry>& pitEntry, const Face& ou
 
   // if no in-record found, drop
   if (inRecord == pitEntry->in_end()) {
-    NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
-                  " nack=" << pitEntry->getInterest().getName() <<
-                  "~" << nack.getReason() << " no-in-record");
+    // NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
+                  // " nack=" << pitEntry->getInterest().getName() <<
+                  // "~" << nack.getReason() << " no-in-record");
     return;
   }
 
   // if multi-access or ad hoc face, drop
   if (outFace.getLinkType() != ndn::nfd::LINK_TYPE_POINT_TO_POINT) {
-    NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
-                  " nack=" << pitEntry->getInterest().getName() <<
-                  "~" << nack.getReason() << " face-is-multi-access");
+    // NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
+                  // " nack=" << pitEntry->getInterest().getName() <<
+                  // "~" << nack.getReason() << " face-is-multi-access");
     return;
   }
 
-  NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
-                " nack=" << pitEntry->getInterest().getName() <<
-                "~" << nack.getReason() << " OK");
+  // NFD_LOG_DEBUG("onOutgoingNack face=" << outFace.getId() <<
+                // " nack=" << pitEntry->getInterest().getName() <<
+                // "~" << nack.getReason() << " OK");
 
   // create Nack packet with the Interest from in-record
   lp::Nack nackPkt(inRecord->getInterest());
