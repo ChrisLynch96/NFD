@@ -395,50 +395,75 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 void
 Forwarder::onPushedData(Face& inFace, const Data& data) {
   NFD_LOG_DEBUG("onPushedData");
-  bool dataInCS = false;
+  // bool dataInCS = false;
+
+  // if (m_csFromNdnSim == nullptr) {
+  //   dataInCS = m_cs.contains(data);
+  //   NFD_LOG_DEBUG("Data in cs=" << dataInCS);
+  // }
+  // else {
+  //   // creating an interest whose name is the same as the data packet to dupe lookup function
+  //   shared_ptr<Interest> interest = make_shared<Interest>();
+  //   interest->setName(data.getName());
+  //   shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
+  //   if (match != nullptr) {
+  //     dataInCS = true;
+  //   }
+  // }
 
   if (m_csFromNdnSim == nullptr) {
-    dataInCS = m_cs.contains(data);
-    NFD_LOG_DEBUG("Data in cs=" << dataInCS);
+    m_cs.insert(data, true);
+    NFD_LOG_DEBUG("Inserting data into content store");
+  } else {
+    m_csFromNdnSim->Add(data.shared_from_this());
+    NFD_LOG_DEBUG("Inserting data into content store");
   }
-  else {
-    // creating an interest whose name is the same as the data packet to dupe lookup function
-    shared_ptr<Interest> interest = make_shared<Interest>();
-    interest->setName(data.getName());
-    shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
-    if (match != nullptr) {
-      dataInCS = true;
+  const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
+  const fib::NextHopList& nexthops = fibEntry.getNextHops();
+
+  // Determine the minimum cost in the RIB entry.
+  uint64_t minCost = std::numeric_limits<uint64_t>::max();
+  for(auto const& nh : nexthops)
+    if(nh.getCost() < minCost)
+      minCost = nh.getCost();
+  
+  // Forward to all devices with minCost.
+  for(auto const& nh : nexthops) {
+    NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
+    if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
+      NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
+      this->onOutgoingData(data, nh.getFace());
     }
   }
 
-  if(!dataInCS) {
-    // If Data was never seen, store it and forward it.
-    // TODO: improve the forwarding strategy adopted here.
-    if (m_csFromNdnSim == nullptr) {
-      m_cs.insert(data, true);
-      NFD_LOG_DEBUG("Inserting data into content store");
-    } else {
-      m_csFromNdnSim->Add(data.shared_from_this());
-      NFD_LOG_DEBUG("Inserting data into content store");
-    }
-    const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
-    const fib::NextHopList& nexthops = fibEntry.getNextHops();
+  // if(!dataInCS) {
+  //   // If Data was never seen, store it and forward it.
+  //   // TODO: improve the forwarding strategy adopted here.
+  //   if (m_csFromNdnSim == nullptr) {
+  //     m_cs.insert(data, true);
+  //     NFD_LOG_DEBUG("Inserting data into content store");
+  //   } else {
+  //     m_csFromNdnSim->Add(data.shared_from_this());
+  //     NFD_LOG_DEBUG("Inserting data into content store");
+  //   }
+  //   const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
+  //   const fib::NextHopList& nexthops = fibEntry.getNextHops();
 
-    // Determine the minimum cost in the RIB entry.
-    uint64_t minCost = std::numeric_limits<uint64_t>::max();
-    for(auto const& nh : nexthops)
-      if(nh.getCost() < minCost)
-        minCost = nh.getCost();
+  //   // Determine the minimum cost in the RIB entry.
+  //   uint64_t minCost = std::numeric_limits<uint64_t>::max();
+  //   for(auto const& nh : nexthops)
+  //     if(nh.getCost() < minCost)
+  //       minCost = nh.getCost();
     
-    // Forward to all devices with minCost.
-    for(auto const& nh : nexthops) {
-      NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
-      if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
-        NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
-        this->onOutgoingData(data, nh.getFace());
-      }
-    }
-  }
+  //   // Forward to all devices with minCost.
+  //   for(auto const& nh : nexthops) {
+  //     NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
+  //     if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
+  //       NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
+  //       this->onOutgoingData(data, nh.getFace());
+  //     }
+  //   }
+  // }
 }
 
 void
