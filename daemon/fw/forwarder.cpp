@@ -31,9 +31,12 @@
 #include "core/logger.hpp"
 #include "table/cleanup.hpp"
 
+
 #include <ndn-cxx/lp/tags.hpp>
 
 #include "face/null-face.hpp"
+
+#include <string.h>
 
 namespace nfd {
 
@@ -282,6 +285,15 @@ Forwarder::onInterestFinalize(const shared_ptr<pit::Entry>& pitEntry)
 void
 Forwarder::onIncomingData(Face& inFace, const Data& data)
 {
+
+  NFD_LOG_DEBUG("Printing out information about the Face");
+  NFD_LOG_DEBUG("Face ID: " << inFace.getId());
+  NFD_LOG_DEBUG("Face Metric: " << inFace.getMetric());
+  NFD_LOG_DEBUG("Face LocalURI: " << inFace.getLocalUri());
+  NFD_LOG_DEBUG("Face RemoteURI: " << inFace.getRemoteUri());
+  NFD_LOG_DEBUG("Face Scope: " << inFace.getScope());
+  NFD_LOG_DEBUG("Face LinkType: " << inFace.getLinkType());
+
   // receive Data
   NFD_LOG_DEBUG("onIncomingData face=" << inFace.getId() << " data=" << data.getName() << " freshness=" << data.getFreshnessPeriod() << " pushed=" << data.getPushed());
   data.setTag(make_shared<lp::IncomingFaceIdTag>(inFace.getId()));
@@ -395,22 +407,51 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 void
 Forwarder::onPushedData(Face& inFace, const Data& data) {
   NFD_LOG_DEBUG("onPushedData");
-  // bool dataInCS = false;
+  bool dataInCS = false;
 
-  // if (m_csFromNdnSim == nullptr) {
-  //   dataInCS = m_cs.contains(data);
-  //   NFD_LOG_DEBUG("Data in cs=" << dataInCS);
-  // }
-  // else {
-  //   // creating an interest whose name is the same as the data packet to dupe lookup function
-  //   shared_ptr<Interest> interest = make_shared<Interest>();
-  //   interest->setName(data.getName());
-  //   shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
-  //   if (match != nullptr) {
-  //     dataInCS = true;
-  //   }
-  // }
+  std::ostringstream oss;
+  oss << inFace.getScope();
+  std::string inFaceScopeString = oss.str();
 
+  NFD_LOG_DEBUG("FaceId= " << inFace.getId() << " Face Scope=" << inFace.getScope());
+
+  if (inFaceScopeString.compare("local") != 0) {
+    dataInCS = contains(data);
+  }
+
+  if(!dataInCS) {
+    forwardPushedData(inFace, data);
+  }
+}
+
+bool
+Forwarder::contains(const Data& data)
+{
+  bool dataInCS = false;
+
+  if (m_csFromNdnSim == nullptr) {
+    NFD_LOG_DEBUG("ndnSim content store check");
+    dataInCS = m_cs.contains(data);
+  }
+  else {
+    NFD_LOG_DEBUG("NDN content store check");
+    // creating an interest whose name is the same as the data packet to dupe lookup function
+    shared_ptr<Interest> interest = make_shared<Interest>();
+    interest->setName(data.getName());
+    shared_ptr<Data> match = m_csFromNdnSim->Lookup(interest->shared_from_this());
+    if (match != nullptr) {
+      dataInCS = true;
+    }
+  }
+
+  NFD_LOG_DEBUG("Data in cs=" << dataInCS);
+  return dataInCS;
+}
+
+void
+Forwarder::forwardPushedData(Face& inFace, const Data& data)
+{
+  // If Data was never seen, store it and forward it.
   if (m_csFromNdnSim == nullptr) {
     m_cs.insert(data, true);
     NFD_LOG_DEBUG("Inserting data into content store");
@@ -435,35 +476,6 @@ Forwarder::onPushedData(Face& inFace, const Data& data) {
       this->onOutgoingData(data, nh.getFace());
     }
   }
-
-  // if(!dataInCS) {
-  //   // If Data was never seen, store it and forward it.
-  //   // TODO: improve the forwarding strategy adopted here.
-  //   if (m_csFromNdnSim == nullptr) {
-  //     m_cs.insert(data, true);
-  //     NFD_LOG_DEBUG("Inserting data into content store");
-  //   } else {
-  //     m_csFromNdnSim->Add(data.shared_from_this());
-  //     NFD_LOG_DEBUG("Inserting data into content store");
-  //   }
-  //   const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
-  //   const fib::NextHopList& nexthops = fibEntry.getNextHops();
-
-  //   // Determine the minimum cost in the RIB entry.
-  //   uint64_t minCost = std::numeric_limits<uint64_t>::max();
-  //   for(auto const& nh : nexthops)
-  //     if(nh.getCost() < minCost)
-  //       minCost = nh.getCost();
-    
-  //   // Forward to all devices with minCost.
-  //   for(auto const& nh : nexthops) {
-  //     NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
-  //     if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
-  //       NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
-  //       this->onOutgoingData(data, nh.getFace());
-  //     }
-  //   }
-  // }
 }
 
 void

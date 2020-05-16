@@ -242,7 +242,17 @@ PUBLIC_WITH_TESTS_ELSE_PRIVATE: // pipelines
   /** \brief incoming Pushed-Data pipeline
    */
   VIRTUAL_WITH_TESTS void
-  onPushedData(Face& face, const Data& data);
+  onPushedData(Face& inFace, const Data& data);
+
+  /** \brief check for if node contains data
+   */
+  VIRTUAL_WITH_TESTS bool
+  contains(const Data& data);
+
+  /** \brief forward data that has pushed flag
+   */
+  VIRTUAL_WITH_TESTS void
+  forwardPushedData(Face& inFace, const Data& data);
 
   /** \brief Data unsolicited pipeline
    */
