@@ -451,14 +451,25 @@ Forwarder::contains(const Data& data)
 void
 Forwarder::forwardPushedData(Face& inFace, const Data& data)
 {
-  // If Data was never seen, store it and forward it.
+
+  shared_ptr<Data> dataCopy = make_shared<Data>();
+
+  dataCopy->setName(data.getName());
+  dataCopy->setFreshnessPeriod(data.getFreshnessPeriod());
+  dataCopy->setContent(data.getContent());
+  dataCopy->setSignature(data.getSignature());
+  dataCopy->setPushed(false);
+
+  // CS insert
   if (m_csFromNdnSim == nullptr) {
-    m_cs.insert(data, true);
-    NFD_LOG_DEBUG("Inserting data into content store");
-  } else {
-    m_csFromNdnSim->Add(data.shared_from_this());
+    m_cs.insert(*dataCopy);
     NFD_LOG_DEBUG("Inserting data into content store");
   }
+  else {
+    m_csFromNdnSim->Add(dataCopy);
+    NFD_LOG_DEBUG("Inserting data into content store");
+  }
+  
   const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
   const fib::NextHopList& nexthops = fibEntry.getNextHops();
 
