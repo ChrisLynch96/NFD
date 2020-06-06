@@ -406,16 +406,10 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
 
 void
 Forwarder::onPushedData(Face& inFace, const Data& data) {
-  NFD_LOG_DEBUG("onPushedData");
+  NFD_LOG_DEBUG("FaceId= " << inFace.getId() << " Face Scope=" << inFace.getScope());
   bool dataInCS = false;
 
-  std::ostringstream oss;
-  oss << inFace.getScope();
-  std::string inFaceScopeString = oss.str();
-
-  NFD_LOG_DEBUG("FaceId= " << inFace.getId() << " Face Scope=" << inFace.getScope());
-
-  if (inFaceScopeString.compare("local") != 0) {
+  if(inFace.getScope() == ndn::nfd::FACE_SCOPE_NON_LOCAL) {
     dataInCS = contains(data);
   }
 
@@ -473,18 +467,32 @@ Forwarder::forwardPushedData(Face& inFace, const Data& data)
   const fib::Entry& fibEntry = m_fib.findLongestPrefixMatch(data.getName());
   const fib::NextHopList& nexthops = fibEntry.getNextHops();
 
-  // Determine the minimum cost in the RIB entry.
+  // Determine the minimum cost in the RIB entry. This really could be better
   uint64_t minCost = std::numeric_limits<uint64_t>::max();
-  for(auto const& nh : nexthops)
-    if(nh.getCost() < minCost)
-      minCost = nh.getCost();
-  
-  // Forward to all devices with minCost.
   for(auto const& nh : nexthops) {
-    NFD_LOG_DEBUG("Possible Hop=" << nh.getFace().getId());
-    if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
-      NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
-      this->onOutgoingData(data, nh.getFace());
+    NFD_LOG_DEBUG("Potential hop " << nh.getFace().getId());
+    if(nh.getCost() < minCost) {
+      minCost = nh.getCost();
+    }
+  }
+
+  // TODO remove the nested if statements --> create a wrapper to hold the conditions to be satisfied for the face
+  if(inFace.getScope() == ndn::nfd::FACE_SCOPE_LOCAL) {
+    for(auto const& nh : nexthops) {
+      if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId()) {
+        NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
+        this->onOutgoingData(data, nh.getFace());
+        break;  // only need to forward to one external face
+      }
+    }
+  } else {
+    for(auto const& nh : nexthops) {
+      NFD_LOG_DEBUG("Evaluating " << nh.getFace().getId() << " minCost: " << minCost << ", nh.cost: " << nh.getCost() << ", scope: " << nh.getFace().getScope());
+      // Don't break incase any other local face desires the pushed data packet
+      if(nh.getCost() == minCost && inFace.getId() != nh.getFace().getId() && (nh.getFace().getScope() == ndn::nfd::FACE_SCOPE_LOCAL)) {
+        NFD_LOG_DEBUG("Pushing data to face " << nh.getFace().getId());
+        this->onOutgoingData(data, nh.getFace());
+      }
     }
   }
 }
